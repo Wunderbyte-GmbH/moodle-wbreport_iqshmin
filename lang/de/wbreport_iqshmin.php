@@ -34,3 +34,4 @@ $string['pluginname']       = 'IQSH-Statistik: MIN';
 $string['reportidentifier'] = 'iqshmin';
 $string['schulart']         = 'Schulart';
 $string['stunden']          = 'Stunden';
+$string['teacher']          = 'Trainer:in(nen)';

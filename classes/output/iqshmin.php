@@ -66,6 +66,7 @@ class iqshmin implements renderable, templatable, wbreport_interface {
 
         $table->define_headers([
             get_string('optionname', 'wbreport_iqshmin'),
+            get_string('teacher', 'wbreport_iqshmin'),
             get_string('coursestarttime', 'wbreport_iqshmin'),
             get_string('courseendtime', 'wbreport_iqshmin'),
             get_string('schulart', 'wbreport_iqshmin'),
@@ -78,6 +79,7 @@ class iqshmin implements renderable, templatable, wbreport_interface {
 
         $table->define_columns([
             'optionname',
+            'teacher',
             'coursestarttime',
             'courseendtime',
             'schulart',
@@ -95,6 +97,22 @@ class iqshmin implements renderable, templatable, wbreport_interface {
         // Fetch the booking module id once via PHP so the main SQL stays free of scalar subqueries.
         $bookingmoduleid = (int) $DB->get_field('modules', 'id', ['name' => 'booking']);
 
+        // Teacher aggregation SQL (DB-specific: PostgreSQL vs MySQL/MariaDB).
+        $dbclass = get_class($DB);
+        if (strpos($dbclass, 'pgsql') !== false) {
+            $teachernamesagg   = "STRING_AGG(CONCAT(u_t.firstname, ' ', u_t.lastname), ', '"
+                               . " ORDER BY u_t.lastname, u_t.firstname)";
+            $teacherexportagg  = "STRING_AGG(CONCAT(u_t.firstname, ' ', u_t.lastname, ' (', u_t.email, ')'),"
+                               . " ', ' ORDER BY u_t.lastname, u_t.firstname)";
+            $teacheruseridsagg = "STRING_AGG(CAST(u_t.id AS TEXT), ',' ORDER BY u_t.lastname, u_t.firstname)";
+        } else {
+            $teachernamesagg   = "GROUP_CONCAT(CONCAT(u_t.firstname, ' ', u_t.lastname)"
+                               . " ORDER BY u_t.lastname, u_t.firstname SEPARATOR ', ')";
+            $teacherexportagg  = "GROUP_CONCAT(CONCAT(u_t.firstname, ' ', u_t.lastname, ' (', u_t.email, ')')"
+                               . " ORDER BY u_t.lastname, u_t.firstname SEPARATOR ', ')";
+            $teacheruseridsagg = "GROUP_CONCAT(u_t.id ORDER BY u_t.lastname, u_t.firstname SEPARATOR ',')";
+        }
+
         $fields = "m.*";
 
         $from = "(
@@ -111,6 +129,9 @@ class iqshmin implements renderable, templatable, wbreport_interface {
                 COALESCE(cfd_fach.value, '')           AS fach,
                 COALESCE(cfd_kategorie.value, '')      AS kategorie,
                 COALESCE(cfd_stunden.decvalue, 0)      AS stunden,
+                COALESCE(tch.teacher_names, '')        AS teacher,
+                COALESCE(tch.teacher_export, '')       AS teacher_export,
+                COALESCE(tch.teacher_userids, '')      AS teacher_userids,
                 {$now}                                 AS generated_at
             FROM {booking_options} bo
             LEFT JOIN {course_modules} cm
@@ -159,6 +180,17 @@ class iqshmin implements renderable, templatable, wbreport_interface {
             LEFT JOIN {customfield_data} cfd_stunden
                 ON  cfd_stunden.instanceid = bo.id
                 AND cfd_stunden.fieldid    = cff_stunden.id
+            LEFT JOIN (
+                SELECT
+                    bt.optionid,
+                    {$teachernamesagg}   AS teacher_names,
+                    {$teacherexportagg}  AS teacher_export,
+                    {$teacheruseridsagg} AS teacher_userids
+                FROM {booking_teachers} bt
+                JOIN {user} u_t ON u_t.id = bt.userid
+                GROUP BY bt.optionid
+            ) tch
+                ON tch.optionid = bo.id
             WHERE COALESCE(ans.bookedusers, 0) < COALESCE(bo.minanswers, 0)
               AND bo.bookingid > 0
         ) m";
@@ -168,10 +200,11 @@ class iqshmin implements renderable, templatable, wbreport_interface {
         // Default sort: worst offenders first (fewest bookings).
         $table->sortable(true, 'bookedusers', SORT_ASC);
 
-        $table->define_fulltextsearchcolumns(['optionname', 'schulart', 'fach', 'kategorie']);
+        $table->define_fulltextsearchcolumns(['optionname', 'teacher', 'schulart', 'fach', 'kategorie']);
 
         $table->define_sortablecolumns([
             'optionname'      => get_string('optionname', 'wbreport_iqshmin'),
+            'teacher'         => get_string('teacher', 'wbreport_iqshmin'),
             'coursestarttime' => get_string('coursestarttime', 'wbreport_iqshmin'),
             'courseendtime'   => get_string('courseendtime', 'wbreport_iqshmin'),
             'schulart'    => get_string('schulart', 'wbreport_iqshmin'),
@@ -181,6 +214,10 @@ class iqshmin implements renderable, templatable, wbreport_interface {
             'bookedusers' => get_string('bookedusers', 'wbreport_iqshmin'),
             'minanswers'  => get_string('minanswers', 'wbreport_iqshmin'),
         ]);
+
+        // Filter: by teacher (full aggregated list per option).
+        $teacherfilter = new standardfilter('teacher', get_string('teacher', 'wbreport_iqshmin'));
+        $table->add_filter($teacherfilter);
 
         // Filter: by school type.
         $schulartfilter = new standardfilter('schulart', get_string('schulart', 'wbreport_iqshmin'));

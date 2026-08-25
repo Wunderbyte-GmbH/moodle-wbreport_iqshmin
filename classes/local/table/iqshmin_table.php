@@ -127,6 +127,27 @@ class iqshmin_table extends wunderbyte_table {
     }
 
     /**
+     * Format the bookinginstance column (name of the booking instance).
+     *
+     * On HTML: link to the booking instance view (/mod/booking/view.php?id=<cmid>).
+     * On download: plain name only.
+     *
+     * @param object $values
+     * @return string
+     */
+    public function col_bookinginstance($values): string {
+        if (empty($values->bookinginstance)) {
+            return '';
+        }
+        $name = format_string($values->bookinginstance);
+        if ($this->is_downloading() || empty($values->cmid)) {
+            return $name;
+        }
+        $url = new \moodle_url('/mod/booking/view.php', ['id' => (int) $values->cmid]);
+        return '<a href="' . $url->out(false) . '">' . $name . '</a>';
+    }
+
+    /**
      * Format the teacher column.
      *
      * On download: "Firstname Lastname (email@example.com), ..." (export format).

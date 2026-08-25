@@ -24,6 +24,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026052800;
+$plugin->version   = 2026082400;
 $plugin->requires  = 2022041900;
 $plugin->component = 'wbreport_iqshmin';

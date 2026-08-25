@@ -22,6 +22,7 @@
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 $string['bookedusers']      = 'Gebuchte Nutzer:innen';
+$string['bookinginstance']  = 'Buchungsinstanz';
 $string['courseendtime']    = 'Ende';
 $string['coursestarttime']  = 'Beginn';
 $string['description']      = 'Dieser Bericht listet alle Buchungsoptionen auf, deren Anzahl aktiver Buchungen unter der konfigurierten Mindestteilnehmerzahl (minanswers) liegt.';

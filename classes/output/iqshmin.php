@@ -40,8 +40,8 @@ use wbreport_iqshmin\local\table\iqshmin_table;
  * One row per booking_option whose number of active bookings
  * (booking_answers with waitinglist = 0) is below the option's minanswers value.
  *
- * Columns: optionname, optiondates, schulart, fach, kategorie, stunden,
- *          bookedusers, minanswers.
+ * Columns: bookinginstance, optionname, optiondates, schulart, fach, kategorie,
+ *          stunden, bookedusers, minanswers.
  *
  * @package     wbreport_iqshmin
  * @copyright   2026 Wunderbyte GmbH <info@wunderbyte.at>
@@ -65,6 +65,7 @@ class iqshmin implements renderable, templatable, wbreport_interface {
         $table = new iqshmin_table('iqshmin_table');
 
         $table->define_headers([
+            get_string('bookinginstance', 'wbreport_iqshmin'),
             get_string('optionname', 'wbreport_iqshmin'),
             get_string('teacher', 'wbreport_iqshmin'),
             get_string('coursestarttime', 'wbreport_iqshmin'),
@@ -78,6 +79,7 @@ class iqshmin implements renderable, templatable, wbreport_interface {
         ]);
 
         $table->define_columns([
+            'bookinginstance',
             'optionname',
             'teacher',
             'coursestarttime',
@@ -123,6 +125,7 @@ class iqshmin implements renderable, templatable, wbreport_interface {
                 bo.coursestarttime                     AS coursestarttime,
                 bo.courseendtime                       AS courseendtime,
                 cm.id                                  AS cmid,
+                COALESCE(b.name, '')                   AS bookinginstance,
                 COALESCE(bo.minanswers, 0)             AS minanswers,
                 COALESCE(ans.bookedusers, 0)           AS bookedusers,
                 COALESCE(cfd_schulart.value, '')       AS schulart,
@@ -134,6 +137,8 @@ class iqshmin implements renderable, templatable, wbreport_interface {
                 COALESCE(tch.teacher_userids, '')      AS teacher_userids,
                 {$now}                                 AS generated_at
             FROM {booking_options} bo
+            LEFT JOIN {booking} b
+                ON  b.id = bo.bookingid
             LEFT JOIN {course_modules} cm
                 ON  cm.instance = bo.bookingid
                 AND cm.module   = {$bookingmoduleid}
@@ -200,9 +205,10 @@ class iqshmin implements renderable, templatable, wbreport_interface {
         // Default sort: worst offenders first (fewest bookings).
         $table->sortable(true, 'bookedusers', SORT_ASC);
 
-        $table->define_fulltextsearchcolumns(['optionname', 'teacher', 'schulart', 'fach', 'kategorie']);
+        $table->define_fulltextsearchcolumns(['bookinginstance', 'optionname', 'teacher', 'schulart', 'fach', 'kategorie']);
 
         $table->define_sortablecolumns([
+            'bookinginstance' => get_string('bookinginstance', 'wbreport_iqshmin'),
             'optionname'      => get_string('optionname', 'wbreport_iqshmin'),
             'teacher'         => get_string('teacher', 'wbreport_iqshmin'),
             'coursestarttime' => get_string('coursestarttime', 'wbreport_iqshmin'),
@@ -214,6 +220,10 @@ class iqshmin implements renderable, templatable, wbreport_interface {
             'bookedusers' => get_string('bookedusers', 'wbreport_iqshmin'),
             'minanswers'  => get_string('minanswers', 'wbreport_iqshmin'),
         ]);
+
+        // Filter: by booking instance.
+        $bookinginstancefilter = new standardfilter('bookinginstance', get_string('bookinginstance', 'wbreport_iqshmin'));
+        $table->add_filter($bookinginstancefilter);
 
         // Filter: by teacher (full aggregated list per option).
         $teacherfilter = new standardfilter('teacher', get_string('teacher', 'wbreport_iqshmin'));
